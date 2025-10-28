@@ -46,7 +46,7 @@ if st.session_state.page == "home":
         pdf_path = "korB_1_mun_6GX74N28.pdf"
     else:
         pdf_path = "mathB_1_mun_L9S69Y1Z.pdf"
-    doc = fitz.open(pdf_path)
+    uploaded_file = fitz.open(pdf_path)
 
     uploaded_file = st.file_uploader("모의고사 PDF 업로드", type=["pdf"])
 
