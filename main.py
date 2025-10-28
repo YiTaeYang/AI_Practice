@@ -48,6 +48,8 @@ if st.session_state.page == "home":
         pdf_path = "../mathB_1_mun_L9S69Y1Z.pdf"
     uploaded_file = fitz.open(pdf_path)
 
+    uploaded_file = st.file_uploader("모의고사 PDF 업로드", type=["pdf"])
+
     if uploaded_file and st.button("시험 시작"):
         st.session_state.subject = subject
         st.session_state.pdf_bytes = uploaded_file.read()
