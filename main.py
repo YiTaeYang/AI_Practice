@@ -40,6 +40,10 @@ def pdf_to_images(pdf_bytes):
 if st.session_state.page == "home":
     st.title("📘 모의고사 시작하기")
     subject = st.radio("과목을 선택하세요", ["국어", "수학"])
+    if subject == "국어":
+        uploaded_file = 
+    else:
+        uploaded_file = 
     uploaded_file = st.file_uploader("모의고사 PDF 업로드", type=["pdf"])
 
     if uploaded_file and st.button("시험 시작"):
