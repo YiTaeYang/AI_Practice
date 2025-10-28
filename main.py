@@ -1,113 +1,135 @@
 import streamlit as st
-import pandas as pd
-import altair as alt
+from PyPDF2 import PdfReader
+import base64
+from io import BytesIO
+import time
 
-st.set_page_config(
-    page_title="MBTI by Country Dashboard",
-    page_icon="🌍",
-    layout="wide",
-)
+# --- 초기 설정 ---
+st.set_page_config(page_title="모의고사 앱", layout="wide")
 
-st.title("🌍 MBTI 유형별 국가 비교 대시보드")
-st.write("업로드한 CSV 파일을 바탕으로 특정 MBTI 유형이 높은 국가 TOP 10을 시각적으로 탐색합니다.")
+# --- 세션 상태 초기화 ---
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+if "subject" not in st.session_state:
+    st.session_state.subject = None
+if "pdf_bytes" not in st.session_state:
+    st.session_state.pdf_bytes = None
+if "answers" not in st.session_state:
+    st.session_state.answers = {}
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 0
+if "time_left" not in st.session_state:
+    st.session_state.time_left = 0
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
 
-# =============================
-# 파일 업로드
-# =============================
-uploaded_file = st.file_uploader("📂 MBTI 데이터 CSV 파일을 업로드하세요", type=["csv"])
+# --- PDF → 이미지 변환 함수 (PyMuPDF 이용) ---
+def pdf_to_images(pdf_bytes):
+    import fitz  # PyMuPDF
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    images = []
+    for i in range(len(doc)):
+        pix = doc[i].get_pixmap()
+        img = BytesIO(pix.tobytes("png"))
+        images.append(img)
+    return images
 
-if uploaded_file is not None:
-    # 데이터 읽기
-    try:
-        df = pd.read_csv(uploaded_file)
-        st.success("✅ 파일이 성공적으로 업로드되었습니다!")
-    except Exception as e:
-        st.error(f"파일을 읽는 중 오류 발생: {e}")
-        st.stop()
+# --- 홈 페이지 ---
+if st.session_state.page == "home":
+    st.title("📘 모의고사 시작하기")
 
-    # MBTI 타입 목록
-    mbti_types = [
-        'INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP',
-        'ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'
-    ]
+    subject = st.radio("과목을 선택하세요", ["국어", "수학"])
+    uploaded_file = st.file_uploader("모의고사 PDF 업로드", type=["pdf"])
 
-    # 국가 컬럼 자동 탐색
-    country_col = None
-    for col in df.columns:
-        if "country" in col.lower():
-            country_col = col
-            break
+    if uploaded_file and st.button("시험 시작"):
+        st.session_state.subject = subject
+        st.session_state.pdf_bytes = uploaded_file.read()
+        st.session_state.images = pdf_to_images(st.session_state.pdf_bytes)
 
-    # MBTI 관련 컬럼 탐색 (각 유형이 열 이름으로 존재하는 경우)
-    mbti_cols = [c for c in df.columns if c.upper() in mbti_types]
+        # 과목별 설정
+        st.session_state.num_questions = 45 if subject == "국어" else 30
+        st.session_state.time_left = 80 * 60 if subject == "국어" else 100 * 60
+        st.session_state.start_time = time.time()
+        st.session_state.page = "exam"
+        st.rerun()
 
-    # 검증
-    if not country_col or not mbti_cols:
-        st.error("⚠️ 'Country' 또는 MBTI 관련 열(INTJ~ESFP 등)을 찾을 수 없습니다.")
-        st.dataframe(df.head())
-        st.stop()
+# --- 시험 페이지 ---
+elif st.session_state.page == "exam":
+    import math
+    from datetime import timedelta
 
-    # =============================
-    # 사용자 선택
-    # =============================
-    selected_type = st.selectbox(
-        "📊 분석할 MBTI 유형을 선택하세요",
-        mbti_cols,
-        index=0
-    )
+    # 1초마다 새로고침 (타이머 실시간 반영)
+    st_autorefresh = st.experimental_rerun
+    count = st.experimental_get_query_params()
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh_interval = st.experimental_data_editor
 
-    # =============================
-    # TOP 10 계산
-    # =============================
-    top10 = (
-        df[[country_col, selected_type]]
-        .dropna()
-        .sort_values(by=selected_type, ascending=False)
-        .head(10)
-    )
+    st_autorefresh = st.experimental_rerun
 
-    # =============================
-    # Altair 시각화
-    # =============================
-    st.subheader(f"🏆 {selected_type} 유형이 높은 국가 TOP 10")
+    # 타이머 업데이트
+    elapsed = time.time() - st.session_state.start_time
+    st.session_state.time_left = max(0, (80*60 if st.session_state.subject == "국어" else 100*60) - int(elapsed))
 
-    chart = (
-        alt.Chart(top10)
-        .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
-        .encode(
-            x=alt.X(f"{selected_type}:Q", title=f"{selected_type} 비율"),
-            y=alt.Y(f"{country_col}:N", sort='-x', title="국가"),
-            color=alt.Color(f"{selected_type}:Q", scale=alt.Scale(scheme='tealblues')),
-            tooltip=[country_col, selected_type]
-        )
-        .properties(width=700, height=400)
-    )
+    if st.session_state.time_left <= 0:
+        st.session_state.page = "result"
+        st.rerun()
 
-    text = chart.mark_text(
-        align='left',
-        baseline='middle',
-        dx=5,
-        color='black'
-    ).encode(
-        text=alt.Text(f"{selected_type}:Q", format=".2f")
-    )
+    # 1초마다 리프레시
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st_autorefresh  # dummy to avoid lint
 
-    st.altair_chart(chart + text, use_container_width=True)
+    st_autorefresh(interval=1000, key="timer_refresh")
 
-    # =============================
-    # 추가 기능
-    # =============================
-    with st.expander("📈 데이터 미리보기"):
-        st.dataframe(df.head(20))
+    st.title(f"📝 {st.session_state.subject} 모의고사")
 
-    with st.expander("🔍 사용 방법"):
-        st.markdown("""
-        1. CSV 파일에 **'Country'** 열과 **각 MBTI 유형(INTJ~ESFP)** 열이 있어야 합니다.  
-        2. 업로드 후 분석할 유형을 선택하면 상위 10개 국가가 표시됩니다.  
-        3. 그래프 막대 위에 마우스를 올리면 값이 표시됩니다.  
-        """)
+    col1, col2 = st.columns([4, 1])
 
-    st.caption("Made with ❤️ using Streamlit & Altair")
+    with col1:
+        start = st.session_state.current_page
+        end = start + 2
+        for img in st.session_state.images[start:end]:
+            st.image(img, use_container_width=True)
 
-else:
-    st.info("⬆️ 먼저 CSV 파일을 업로드해주세요. 예시 데이터에는 'Country', 'INTJ', 'INFP' 등의 열이 포함되어야 합니다.")
+        col_a, col_b = st.columns(2)
+        if col_a.button("⬅ 이전"):
+            if st.session_state.current_page > 0:
+                st.session_state.current_page -= 2
+                st.rerun()
+        if col_b.button("다음 ➡"):
+            if st.session_state.current_page + 2 < len(st.session_state.images):
+                st.session_state.current_page += 2
+                st.rerun()
+
+    with col2:
+        st.subheader("OMR 서랍")
+        st.write(f"({st.session_state.num_questions}문항)")
+
+        for i in range(1, st.session_state.num_questions + 1):
+            st.session_state.answers[i] = st.number_input(
+                f"{i}번", min_value=1, max_value=5, step=1,
+                value=st.session_state.answers.get(i, 1),
+                key=f"ans_{i}"
+            )
+
+        # 타이머 표시
+        minutes = st.session_state.time_left // 60
+        seconds = st.session_state.time_left % 60
+        st.metric("남은 시간", f"{minutes:02d}:{seconds:02d}")
+
+        if st.button("시험 종료"):
+            st.session_state.page = "result"
+            st.rerun()
+
+# --- 결과 페이지 ---
+elif st.session_state.page == "result":
+    st.title("📊 결과 확인")
+
+    st.write("OMR 입력 결과:")
+    st.write(st.session_state.answers)
+
+    st.success("시험이 종료되었습니다. 수고하셨습니다! 👏")
+
+    if st.button("처음으로 돌아가기"):
+        for k in list(st.session_state.keys()):
+            del st.session_state[k]
+        st.rerun()
