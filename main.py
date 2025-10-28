@@ -89,7 +89,7 @@ elif st.session_state.page == "exam":
 
     # OMR 서랍
     with col2:
-        st.subheader("OMR 서랍")
+        st.subheader("OMR")
         st.write(f"({st.session_state.num_questions}문항)")
         for i in range(1, st.session_state.num_questions+1):
             st.session_state.answers[i] = st.number_input(
@@ -97,10 +97,7 @@ elif st.session_state.page == "exam":
                 value=st.session_state.answers.get(i,1),
                 key=f"ans_{i}"
             )
-        minutes = st.session_state.time_left // 60
-        seconds = st.session_state.time_left % 60
-        st.metric("남은 시간", f"{minutes:02d}:{seconds:02d}")
-
+        
         if st.button("시험 종료"):
             st.session_state.page = "result"
             st.rerun()
