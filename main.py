@@ -66,7 +66,6 @@ elif st.session_state.page == "exam":
         st.rerun()
 
     # 타이머 자동 새로고침
-    st.experimental_rerun()  # 1초마다 페이지 새로고침
     st.title(f"📝 {st.session_state.subject} 모의고사")
 
     col1, col2 = st.columns([4,1])
