@@ -40,10 +40,14 @@ def pdf_to_images(pdf_bytes):
 if st.session_state.page == "home":
     st.title("📘 모의고사 시작하기")
     subject = st.radio("과목을 선택하세요", ["국어", "수학"])
+
+    pdf_path = "mathB_1_mun_L9S69Y1Z.pdf"
     if subject == "국어":
-        uploaded_file = 
+        pdf_path = "korB_1_mun_6GX74N28.pdf"
     else:
-        uploaded_file = 
+        pdf_path = "mathB_1_mun_L9S69Y1Z.pdf"
+    doc = fitz.open(pdf_path)
+
     uploaded_file = st.file_uploader("모의고사 PDF 업로드", type=["pdf"])
 
     if uploaded_file and st.button("시험 시작"):
